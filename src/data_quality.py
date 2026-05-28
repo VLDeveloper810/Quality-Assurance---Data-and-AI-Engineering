@@ -1,10 +1,14 @@
 import sys
-from pyspark.sql import DataFrame
+
 import pyspark.sql.functions as F
+from pyspark.sql import DataFrame
+
 
 class CircuitBreakerException(Exception):
     """Custom Exception thrown when a data contract check fails."""
+
     pass
+
 
 def run_source_quality_checks(df: DataFrame, source_name: str, name_col: str):
     """
