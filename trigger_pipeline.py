@@ -1,6 +1,22 @@
+import os
 import subprocess
 import sys
 import time
+
+# =====================================================================
+# 🎛️ SYSTEM LEVEL WINDOWS PATCH (COPIES HADOOP CONFIG TO ALL SUBPROCESSES)
+# =====================================================================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOCAL_HADOOP = os.path.join(BASE_DIR, "hadoop")
+
+if os.path.exists(LOCAL_HADOOP):
+    os.environ["HADOOP_HOME"] = LOCAL_HADOOP
+    os.environ["PATH"] = (
+        os.path.join(LOCAL_HADOOP, "bin") + os.pathsep + os.environ.get("PATH", "")
+    )
+    print(
+        f"--> [Orchestrator Patch] Global Hadoop Binaries injected: {LOCAL_HADOOP}"
+    )
 
 
 def run_script(script_path, description):
@@ -11,7 +27,13 @@ def run_script(script_path, description):
 
     start_time = time.time()
 
-    process = subprocess.Popen([sys.executable, script_path], stdout=None, stderr=None)
+    # Pass os.environ down explicitly so subprocesses inherit our Hadoop paths
+    process = subprocess.Popen(
+        [sys.executable, script_path],
+        stdout=None,
+        stderr=None,
+        env=os.environ.copy(),  # 👈 This ensures the child process inherits the patch
+    )
     process.communicate()
 
     elapsed_time = time.time() - start_time
@@ -33,7 +55,8 @@ if __name__ == "__main__":
 
     # Phase 1: Mock Data Generation and S3 Partition Syncing
     run_script(
-        "./mock_data_generator/generate_mock_data.py", "Data Generation & AWS S3 Upload"
+        "./mock_data_generator/generate_mock_data.py",
+        "Data Generation & AWS S3 Upload",
     )
 
     # Phase 2: Ingestion, Quality Checks, LLM Enrichment, and Iceberg Upsert

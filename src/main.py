@@ -28,7 +28,11 @@ if not all([AWS_KEY, AWS_SECRET, BUCKET_NAME]):
     print("\n[CRITICAL ERROR]: Missing required environment variables in .env file!")
     sys.exit(1)
 
-WAREHOUSE_PATH = "D:/vs_code/qa/iceberg_warehouse"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
+
+# Dynamically route the Iceberg local warehouse relative to the active root
+WAREHOUSE_PATH = os.path.join(PROJECT_ROOT, "iceberg_warehouse")
 
 # -----------------------------------------------------------------------------
 # Step 1: Iceberg spark session with lightweight local catalog
@@ -71,8 +75,6 @@ except Exception as e:
 # -----------------------------------------------------------------------------
 # Dynamic path resoultions
 # -----------------------------------------------------------------------------
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
 CONFIG_PATH = os.path.join(PROJECT_ROOT, "config", "operational_thresholds.json")
 
 print(f"--> [Config Engine] Safely loading dynamic boundaries from: {CONFIG_PATH}")
