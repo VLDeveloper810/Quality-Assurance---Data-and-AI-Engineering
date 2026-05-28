@@ -1,0 +1,21 @@
+# Environment Variables & Secrets
+.env
+*.log
+
+# Python & PySpark
+__pycache__/
+
+# Virtual Environments
+venv/
+
+# IDE & Editor
+.vscode/
+
+iceberg_warehouse/
+spark-warehouse/
+
+# MLflow & Model Artifacts
+mlruns/
+
+# Pytest & Test Coverage
+.pytest_cache/

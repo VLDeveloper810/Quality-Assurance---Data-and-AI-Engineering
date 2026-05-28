@@ -1,0 +1,10 @@
+{
+    "entity_resolution": {
+        "suffix_regex": "(?i)\\b(inc|llc|corp|incorporated|group|co|ltd|international)\\b|[.,_]",
+        "levenshtein_threshold": 2
+    },
+    "drift_monitoring": {
+        "historical_average_pct": 65.0,
+        "threshold_deviation_pct": 15.0
+    }
+}
