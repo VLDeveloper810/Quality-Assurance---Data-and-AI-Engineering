@@ -380,20 +380,13 @@ reconcile_pipeline_delivery(
     spark_session=spark,
 )
 
-# Clean up cached DataFrames to free memory before Spark shutdown
-df_s1_raw.unpersist()
-df_s2_raw.unpersist()
-df_s1_clean.unpersist()
-df_s2_clean.unpersist()
-df_final_production.unpersist()
-
-spark.stop()
-print("--> Ingestion process terminated cleanly. Spark engine closed down.")
-
-# Hand over to ML trainig pipeline
-ml_telemetry_records = run_ml_training_pipeline()
+# --- CLOSE DOWN INGESTION SPARK ENGINE (only after ML pipeline uses it) ---
+# Hand over to ML training pipeline with SHARED Spark session (no restart needed!)
+ml_telemetry_records = run_ml_training_pipeline(spark=spark)
 
 # Export the final dashboard, now loaded with your versioned ML metrics
 monitor.export_structured_health_dashboard(ml_metrics=ml_telemetry_records)
 
-print("--> Pipeline execution completed successfully.")
+# Clean up Spark session after both pipelines complete
+spark.stop()
+print("--> Spark engine shutdown. Pipeline execution completed successfully.")

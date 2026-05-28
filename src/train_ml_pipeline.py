@@ -11,7 +11,16 @@ from pyspark.sql import functions as F
 from metrics_logger import PipelineMonitor, logger
 
 
-def run_ml_training_pipeline():
+def run_ml_training_pipeline(spark=None):
+    """
+    Run ML training pipeline with optional pre-existing Spark session.
+    
+    Args:
+        spark: Optional pre-initialized SparkSession. If None, creates new session.
+        
+    Returns:
+        dict: ML metrics {version, accuracy, baseline}
+    """
     print("\n" + "=" * 70)
     print("🚀 LAUNCHING DOWNSTREAM SPARK-ML MODEL TRAINING & VERSION REGISTRY")
     print("=" * 70)
@@ -36,14 +45,19 @@ def run_ml_training_pipeline():
     mlflow.set_experiment("Corporate_Profitability_Analysis")
 
     # -------------------------------------------------------------------------
-    # 2. Initialize Iceberg-Aware Compute Engine
+    # 2. Reuse Spark Session if provided, otherwise create new one
     # -------------------------------------------------------------------------
-    spark = (
+    should_stop_spark = False
+    
+    if spark is None:
+        # Create new session only if not provided (fallback for standalone execution)
+        print("--> [Spark] Creating new Spark session (standalone mode)...")
+        spark = (
             SparkSession.builder.appName("Iceberg-SparkML-Training-Service")
             .master("local[*]")
             .config(
                 "spark.jars.packages",
-                "org.apache.iceberg:iceberg-spark-runtime-3.4_2.12:1.3.1",
+                "org.apache.iceberg:iceberg-spark-runtime-3.4_2.12:1.3.1,org.apache.hadoop:hadoop-aws:3.3.4",
             )
             .config(
                 "spark.sql.extensions",
@@ -54,7 +68,10 @@ def run_ml_training_pipeline():
             .config("spark.sql.catalog.local_cat.warehouse", WAREHOUSE_PATH)
             .getOrCreate()
         )
-            # .config("spark.hadoop.fs.file.impl", "org.apache.hadoop.fs.RawLocalFileSystem")
+        should_stop_spark = True
+    else:
+        # Reuse existing session (main.py orchestration path)
+        print("--> [Spark] Reusing existing Spark session from main pipeline...")
 
     # Read directly from the updated Iceberg Registry Table
     target_table = "local_cat.db.corporate_registry"
@@ -63,7 +80,8 @@ def run_ml_training_pipeline():
 
     if df_iceberg.count() == 0:
         print("[ERROR] Iceberg registry table is empty. Model training aborted.")
-        spark.stop()
+        if should_stop_spark:
+            spark.stop()
         return {"version": "N/A", "accuracy": 0.0, "baseline": 0.8500}
 
     # -------------------------------------------------------------------------
@@ -135,7 +153,12 @@ def run_ml_training_pipeline():
     print("--> [Registry] Successfully committed serialized model binary & metrics to disk.")
     print(f"    Registered Model Run Version: {active_version}")
 
-    spark.stop()
+    # Only stop Spark if we created it (not shared from main pipeline)
+    if should_stop_spark:
+        spark.stop()
+        print("--> [Spark] Spark session closed (standalone mode).")
+    else:
+        print("--> [Spark] Spark session retained for main pipeline cleanup.")
     
     # Return genuine data payload right back to your dashboard monitor engine
     return {
