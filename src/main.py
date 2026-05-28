@@ -1,14 +1,12 @@
-import io
 import json
 import os
 import sys
 
 import boto3
-import pandas as pd
 from dotenv import load_dotenv
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
-from pyspark.sql.types import StringType
+from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 from pyspark.sql.window import Window
 
 from data_quality import CircuitBreakerException, run_source_quality_checks
@@ -42,7 +40,7 @@ spark = (
     SparkSession.builder.appName("Iceberg-Boto3-LLM-Deduplication-Pipeline")
     .master("local[*]")
     .config(
-        "spark.jars.packages", "org.apache.iceberg:iceberg-spark-runtime-3.4_2.12:1.3.1"
+        "spark.jars.packages", "org.apache.iceberg:iceberg-spark-runtime-3.4_2.12:1.3.1,org.apache.hadoop:hadoop-aws:3.3.4"
     )
     .config(
         "spark.sql.extensions",
@@ -51,6 +49,10 @@ spark = (
     .config("spark.sql.catalog.local_cat", "org.apache.iceberg.spark.SparkCatalog")
     .config("spark.sql.catalog.local_cat.type", "hadoop")
     .config("spark.sql.catalog.local_cat.warehouse", WAREHOUSE_PATH)
+    .config("spark.hadoop.fs.s3a.access.key", AWS_KEY)
+    .config("spark.hadoop.fs.s3a.secret.key", AWS_SECRET)
+    .config("spark.hadoop.fs.s3a.endpoint", f"s3.{AWS_REGION}.amazonaws.com")
+    .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
     .getOrCreate()
 )
 
@@ -86,30 +88,67 @@ suffix_regex = pipeline_config["entity_resolution"]["suffix_regex"]
 historical_avg = pipeline_config["drift_monitoring"]["historical_average_pct"]
 deviation = pipeline_config["drift_monitoring"]["threshold_deviation_pct"]
 
+# Define explicit schemas for both sources (avoids inference overhead)
+schema_s1 = StructType([
+    StructField("corporate_name_S1", StringType(), True),
+    StructField("address", StringType(), True),
+    StructField("activity_places", StringType(), True),
+    StructField("top_suppliers", StringType(), True),
+])
+
+schema_s2 = StructType([
+    StructField("corporate_name_S2", StringType(), True),
+    StructField("main_customers", StringType(), True),
+    StructField("revenue", DoubleType(), True),
+    StructField("profit", DoubleType(), True),
+])
+
+# Use boto3 only for discovery, then read directly with Spark (distributed + efficient)
 df_s1_raw = None
 df_s2_raw = None
+
+print("--> [Spark S3] Reading CSV files directly from S3 using distributed file system...")
 
 if "Contents" in response:
     for obj in response["Contents"]:
         key = obj["Key"]
         if not key.endswith("/") and key.endswith(".csv"):
-            print(f"    Processing S3 object dynamically: {key}")
+            s3_path = f"s3a://{BUCKET_NAME}/{key}"
+            print(f"    Processing S3 object: {s3_path}")
             try:
-                file_obj = s3_client.get_object(Bucket=BUCKET_NAME, Key=key)
-                raw_data = file_obj["Body"].read()
-                pdf = pd.read_csv(io.BytesIO(raw_data))
-                spark_df = spark.createDataFrame(pdf)
-
-                cols = spark_df.columns
+                # Use Spark's native CSV reader (distributed, memory-efficient)
+                df_temp = spark.read.csv(
+                    s3_path,
+                    header=True,
+                    inferSchema=False,
+                    mode="FAILFAST"
+                )
+                
+                cols = df_temp.columns
+                
                 if "corporate_name_S1" in cols:
-                    df_s1_raw = spark_df
+                    # Re-read with proper schema for Source 1
+                    df_s1_raw = spark.read.csv(
+                        s3_path,
+                        schema=schema_s1,
+                        header=True,
+                        mode="FAILFAST"
+                    )
                     print(f"      [ROUTED] Assigned '{key}' as Source 1 (Supply Chain)")
+                    
                 elif "corporate_name_S2" in cols:
-                    df_s2_raw = spark_df
+                    # Re-read with proper schema for Source 2
+                    df_s2_raw = spark.read.csv(
+                        s3_path,
+                        schema=schema_s2,
+                        header=True,
+                        mode="FAILFAST"
+                    )
                     print(f"      [ROUTED] Assigned '{key}' as Source 2 (Financial)")
+                    
             except Exception as stream_err:
                 print(
-                    f"      [ERROR] Failed to process streaming files for key '{key}': {stream_err}"
+                    f"      [ERROR] Failed to process S3 object '{key}': {stream_err}"
                 )
 
 if df_s1_raw is None or df_s2_raw is None:
