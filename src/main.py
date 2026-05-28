@@ -156,7 +156,11 @@ if df_s1_raw is None or df_s2_raw is None:
     spark.stop()
     sys.exit(1)
 
-# Log metrics info
+# Cache DataFrames to avoid repeated scans
+df_s1_raw.cache()
+df_s2_raw.cache()
+
+# Log metrics info (single count operations)
 monitor.metrics["source_1_supply_chain_row_count"] = df_s1_raw.count()
 monitor.metrics["source_2_financial_row_count"] = df_s2_raw.count()
 
@@ -201,6 +205,10 @@ df_s2_clean = df_s2_raw.filter(F.col("corporate_name_S2").isNotNull()).withColum
     "norm_name_s2",
     F.trim(F.regexp_replace(F.lower(F.col("corporate_name_S2")), suffix_regex, "")),
 )
+
+# Cache cleaned data before expensive join operation
+df_s1_clean.cache()
+df_s2_clean.cache()
 
 print(
     "--> [Entity Resolution] Pairing records via Levenshtein Fuzzy Distance Metrics..."
@@ -252,7 +260,10 @@ df_final_production = (
     .drop("row_num")
 )
 
-# Caputing input count for reconcilation logic
+# Cache final production data (used multiple times: count + enrichment + merge)
+df_final_production.cache()
+
+# Capture input count for reconciliation logic (single count from cache)
 deduplicated_input_count = df_final_production.count()
 print(
     f"    [FIX] Duplicate matching instances successfully purged. Ingestion target: {deduplicated_input_count} rows."
@@ -369,6 +380,12 @@ reconcile_pipeline_delivery(
     spark_session=spark,
 )
 
+# Clean up cached DataFrames to free memory before Spark shutdown
+df_s1_raw.unpersist()
+df_s2_raw.unpersist()
+df_s1_clean.unpersist()
+df_s2_clean.unpersist()
+df_final_production.unpersist()
 
 spark.stop()
 print("--> Ingestion process terminated cleanly. Spark engine closed down.")
