@@ -198,10 +198,16 @@ print(final_df.count())
 The MLflow local tracking URI is set to the repository `mlruns/` folder.
 
 ### View via MLflow UI
-Run:
+Run either of these commands from the repository root:
 
 ```bash
 mlflow ui --backend-store-uri mlruns
+```
+
+If `mlflow` is not on your PATH, use the Python module instead:
+
+```bash
+python -m mlflow ui --backend-store-uri mlruns
 ```
 
 Then open the browser at:
