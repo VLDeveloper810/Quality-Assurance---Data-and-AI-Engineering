@@ -12,6 +12,11 @@ This repository implements a Python-based Lakehouse pipeline that:
 
 The main orchestration entrypoint is `trigger_pipeline.py`.
 
+## Demo Video
+Watch a short walkthrough of the project here:
+
+https://drive.google.com/file/d/1ozId1M7NVC23ytjmfE6z6_tX1DXdVBxS/view?usp=sharing
+
 ## Architecture
 The pipeline is built as a local end-to-end data workflow with the following stages:
 
