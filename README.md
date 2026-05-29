@@ -232,22 +232,6 @@ mlruns/<run_id>/artifacts/logistic_regression_model
 
 Look for `MLmodel`, `python_env.yaml`, and the saved Spark ML model files.
 
-## Troubleshooting
-### Common issues
-- `Missing required environment variables`: ensure `.env` exists and contains all keys.
-- `S3 access error`: verify AWS keys and `BUCKET_NAME` permissions.
-- `Spark package download failure`: ensure network access or predownload dependencies.
-- `Iceberg warehouse path missing`: make sure `iceberg_warehouse/` exists and Spark can write there.
-
-### Validation checklist
-- [ ] Python environment active
-- [ ] `requirements.txt` installed
-- [ ] `.env` configured with valid AWS credentials
-- [ ] S3 bucket reachable from local machine
-- [ ] `hadoop/` folder present for Windows
-- [ ] `iceberg_warehouse/` folder present
-- [ ] `mlruns/` folder present or writable
-
 ## File references
 - `trigger_pipeline.py` — main orchestration
 - `mock_data_generator/generate_mock_data.py` — synthetic dataset generator
@@ -256,7 +240,3 @@ Look for `MLmodel`, `python_env.yaml`, and the saved Spark ML model files.
 - `src/metrics_logger.py` — pipeline logging and telemetry
 - `config/operational_thresholds.json` — pipeline parameters and thresholds
 - `check_data.py` — Iceberg table inspection tool
-
-## Notes
-- This assignment is designed for local development and prototype execution.
-- For production deployment, ensure credentials and logging are managed securely, and move the metastore to a dedicated catalog service if required.
