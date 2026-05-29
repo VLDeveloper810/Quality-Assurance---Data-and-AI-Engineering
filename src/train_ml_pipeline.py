@@ -21,9 +21,9 @@ def run_ml_training_pipeline(spark=None):
     Returns:
         dict: ML metrics {version, accuracy, baseline}
     """
-    print("\n" + "=" * 70)
-    print("🚀 LAUNCHING DOWNSTREAM SPARK-ML MODEL TRAINING & VERSION REGISTRY")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("LAUNCHING DOWNSTREAM SPARK-ML MODEL TRAINING & VERSION REGISTRY")
+    logger.info("=" * 70)
 
     # -------------------------------------------------------------------------
     # 1. OS-Agnostic Path Calculations & Centralized MLflow Setup
@@ -37,7 +37,7 @@ def run_ml_training_pipeline(spark=None):
     if os.path.exists(LOCAL_HADOOP_DIR):
         os.environ["HADOOP_HOME"] = LOCAL_HADOOP_DIR
         os.environ["PATH"] += os.pathsep + os.path.join(LOCAL_HADOOP_DIR, "bin")
-        print(f"--> [Windows Patch] Embedded Hadoop Binaries locked at: {LOCAL_HADOOP_DIR}")
+        logger.info(f"--> [Windows Patch] Embedded Hadoop Binaries locked at: {LOCAL_HADOOP_DIR}")
 
     # Force MLflow to log universally to the project root directory
     formatted_mlruns_path = MLRUNS_DIR.replace("\\", "/")
@@ -51,7 +51,7 @@ def run_ml_training_pipeline(spark=None):
     
     if spark is None:
         # Create new session only if not provided (fallback for standalone execution)
-        print("--> [Spark] Creating new Spark session (standalone mode)...")
+        logger.info("--> [Spark] Creating new Spark session (standalone mode)...")
         spark = (
             SparkSession.builder.appName("Iceberg-SparkML-Training-Service")
             .master("local[*]")
@@ -71,15 +71,15 @@ def run_ml_training_pipeline(spark=None):
         should_stop_spark = True
     else:
         # Reuse existing session (main.py orchestration path)
-        print("--> [Spark] Reusing existing Spark session from main pipeline...")
+        logger.info("--> [Spark] Reusing existing Spark session from main pipeline...")
 
     # Read directly from the updated Iceberg Registry Table
     target_table = "local_cat.db.corporate_registry"
-    print(f"--> [Data Source] Reading consolidated records from Iceberg: {target_table}")
+    logger.info(f"--> [Data Source] Reading consolidated records from Iceberg: {target_table}")
     df_iceberg = spark.sql(f"SELECT * FROM {target_table}")
 
     if df_iceberg.count() == 0:
-        print("[ERROR] Iceberg registry table is empty. Model training aborted.")
+        logger.error("[ERROR] Iceberg registry table is empty. Model training aborted.")
         if should_stop_spark:
             spark.stop()
         return {"version": "N/A", "accuracy": 0.0, "baseline": 0.8500}
@@ -87,7 +87,7 @@ def run_ml_training_pipeline(spark=None):
     # -------------------------------------------------------------------------
     # 3. Enhanced Feature Engineering (Fulfills Explicit Requirements)
     # -------------------------------------------------------------------------
-    print("--> [Feature Engineering] Parsing input array elements and labels...")
+    logger.info("--> [Feature Engineering] Parsing input array elements and labels...")
 
     # A. Label Definition: Predict if a corporation's profit is above $100,000
     # B. Supplier Count Extractor: Count commas in the string column to find total count
@@ -112,7 +112,7 @@ def run_ml_training_pipeline(spark=None):
     # -------------------------------------------------------------------------
     # 4. Model Training & Active MLflow Tracking / Registration
     # -------------------------------------------------------------------------
-    print("--> [Model Training] Fitting Estimator and writing to MLflow Registry...")
+    logger.info("--> [Model Training] Fitting Estimator and writing to MLflow Registry...")
 
     # Open a real, local transaction context with your MLflow backend directory
     with mlflow.start_run() as run:
@@ -136,7 +136,7 @@ def run_ml_training_pipeline(spark=None):
         
         # Ensure fallback sanity metric boundary
         final_auc = auc_metric if auc_metric > 0 else 0.8920
-        print(f"    [METRIC] Evaluation Area Under ROC: {final_auc:.4f}")
+        logger.info(f"    [METRIC] Evaluation Area Under ROC: {final_auc:.4f}")
 
         # --- LOG GENUINE METADATA RUN TO MLFLOW REGISTRY ---
         mlflow.log_param("estimator_class", "LogisticRegression")
@@ -150,15 +150,15 @@ def run_ml_training_pipeline(spark=None):
         run_id = run.info.run_id[0:8]
         active_version = f"v_run_{run_id}"
 
-    print("--> [Registry] Successfully committed serialized model binary & metrics to disk.")
-    print(f"    Registered Model Run Version: {active_version}")
+    logger.info("--> [Registry] Successfully committed serialized model binary & metrics to disk.")
+    logger.info(f"    Registered Model Run Version: {active_version}")
 
     # Only stop Spark if we created it (not shared from main pipeline)
     if should_stop_spark:
         spark.stop()
-        print("--> [Spark] Spark session closed (standalone mode).")
+        logger.info("--> [Spark] Spark session closed (standalone mode).")
     else:
-        print("--> [Spark] Spark session retained for main pipeline cleanup.")
+        logger.info("--> [Spark] Spark session retained for main pipeline cleanup.")
     
     # Return genuine data payload right back to your dashboard monitor engine
     return {

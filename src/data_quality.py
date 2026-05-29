@@ -3,6 +3,8 @@ import sys
 import pyspark.sql.functions as F
 from pyspark.sql import DataFrame
 
+from metrics_logger import logger
+
 
 class CircuitBreakerException(Exception):
     """Custom Exception thrown when a data contract check fails."""
@@ -14,7 +16,7 @@ def run_source_quality_checks(df: DataFrame, source_name: str, name_col: str):
     """
     Evaluates incoming DataFrames against explicit business data rules.
     """
-    print(f"--> [Circuit Breaker] Evaluating data rules for {source_name}...")
+    logger.info(f"--> [Circuit Breaker] Evaluating data rules for {source_name}...")
 
     # Rule 1: Validate Critical Null Fields on the correct name column
     null_count = df.filter(F.col(name_col).isNull() | (F.col(name_col) == "")).count()
@@ -34,4 +36,4 @@ def run_source_quality_checks(df: DataFrame, source_name: str, name_col: str):
                 "Aborting pipeline execution."
             )
 
-    print(f"    [PASS] {source_name} successfully passed all data contract checks.")
+    logger.info(f"    [PASS] {source_name} successfully passed all data contract checks.")

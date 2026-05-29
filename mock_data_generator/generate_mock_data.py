@@ -1,11 +1,18 @@
 import csv
 import io
+import logging
 import os
 import random
 from pathlib import Path
 
 import boto3
 from dotenv import load_dotenv
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger("MockDataGenerator")
 
 # Configuration Flag
 GENERATE_CORRUPTED = False
@@ -62,7 +69,7 @@ load_dotenv(dotenv_path=env_path)
 
 
 def generate_and_upload_datasets():
-    print(
+    logger.info(
         f"--> Generating mockup datasets inside RAM memory structures (Mode: {'CORRUPTED' if GENERATE_CORRUPTED else 'CLEAN'})..."
     )
 
@@ -72,7 +79,7 @@ def generate_and_upload_datasets():
     BUCKET_NAME = os.getenv("BUCKET_NAME")
 
     if not all([AWS_KEY, AWS_SECRET, BUCKET_NAME]):
-        print(
+        logger.error(
             "\n[CRITICAL ERROR]: S3 environment variables missing in .env. Execution halted."
         )
         return
@@ -84,7 +91,7 @@ def generate_and_upload_datasets():
         region_name=AWS_REGION,
     )
 
-    num_records = 1050
+    num_records = 5000
 
     # DATASET 1: SUPPLY CHAIN DATA
     s1_buffer = io.StringIO()
@@ -137,7 +144,7 @@ def generate_and_upload_datasets():
         profit = int(revenue * random.uniform(0.05, 0.25))
         writer2.writerow([corp_name, main_customers, revenue, profit])
 
-    print("--> [Boto3] Streaming memory streams straight into S3 Cloud Storage...")
+    logger.info("--> [Boto3] Streaming memory streams straight into S3 Cloud Storage...")
     try:
         # Stream buffer directly without saving anything to the drive
         s3_client.put_object(
@@ -145,18 +152,18 @@ def generate_and_upload_datasets():
             Key="supply_chain/source1_supply_chain.csv",
             Body=s1_buffer.getvalue(),
         )
-        print("    [STREAMED] -> supply_chain/source1_supply_chain.csv")
+        logger.info("    [STREAMED] -> supply_chain/source1_supply_chain.csv")
 
         s3_client.put_object(
             Bucket=BUCKET_NAME,
             Key="financial/source2_financial.csv",
             Body=s2_buffer.getvalue(),
         )
-        print("    [STREAMED] -> financial/source2_financial.csv")
+        logger.info("    [STREAMED] -> financial/source2_financial.csv")
 
-        print("🎉 Cloud dataset synchronization complete! Virtual allocations freed.")
+        logger.info("Cloud dataset synchronization complete! Virtual allocations freed.")
     except Exception as e:
-        print(
+        logger.error(
             f"[AWS S3 STREAM ERROR]: Failed to push memory streams directly to cloud objects.\nDetails: {e}"
         )
 

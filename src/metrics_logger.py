@@ -41,7 +41,7 @@ class PipelineMonitor:
             duration = time.time() - self.start_times[stage_name]
             self.metrics[f"{stage_name}_duration_seconds"] = round(duration, 3)
             logger.info(
-                f"⏱️ [SLA TRACKING] Stage '{stage_name}' completed in {duration:.3f} seconds."
+                f"[SLA TRACKING] Stage '{stage_name}' completed in {duration:.3f} seconds."
             )
             return duration
         return 0
@@ -62,18 +62,18 @@ class PipelineMonitor:
         upper_bound = historical_average + threshold_deviation
 
         logger.info(
-            f"📊 [MONITOR] Current Match Rate: {match_rate:.2f}% (Historical Baseline: {historical_average}%)"
+            f"[MONITOR] Current Match Rate: {match_rate:.2f}% (Historical Baseline: {historical_average}%)"
         )
 
         if match_rate < lower_bound or match_rate > upper_bound:
             logger.warning(
-                f"🚨 [ANOMALY DETECTED] Entity Drift Alert! Match rate of {match_rate:.2f}% "
+                f"[ANOMALY DETECTED] Entity Drift Alert! Match rate of {match_rate:.2f}% "
                 f"deviates sharply from historical expected limits ({lower_bound}% - {upper_bound}%)."
             )
             self.metrics["entity_drift_triggered"] = True
         else:
             logger.info(
-                "✅ [HEALTH] Entity match rates fall within safe statistical boundaries."
+                "[HEALTH] Entity match rates fall within safe statistical boundaries."
             )
             self.metrics["entity_drift_triggered"] = False
 
@@ -98,7 +98,7 @@ class PipelineMonitor:
         }
 
         border = "=" * 69
-        title = "🖥️  STRUCTURED HEALTH DASHBOARD (MOCK PROMETHEUS METRIC EXPORT)"
+        title = "STRUCTURED HEALTH DASHBOARD (MOCK PROMETHEUS METRIC EXPORT)"
         json_body = json.dumps(dashboard, indent=4)
 
         logger.info(f"\n{border}\n{title}\n{border}\n{json_body}\n{border}\n")
@@ -113,7 +113,7 @@ class PipelineMonitor:
 
         # Format beautiful string lines
         border = "=" * 69
-        title = "🖥️  STRUCTURED HEALTH DASHBOARD (MOCK PROMETHEUS METRIC EXPORT)"
+        title = "STRUCTURED HEALTH DASHBOARD (MOCK PROMETHEUS METRIC EXPORT)"
         json_body = json.dumps(dashboard, indent=4)
 
         # Log via our dedicated channels so it hits BOTH screen and file seamlessly
